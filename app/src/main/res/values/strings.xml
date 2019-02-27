@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Hello__World</string>
+    <string name="mymsg">MyMsg</string>
+    <string name="go">Go!</string>
+</resources>
