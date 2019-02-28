@@ -17,6 +17,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import java.io.IOException;
 
@@ -37,7 +38,10 @@ public class MainActivity extends AppCompatActivity {
         //--- {Setup for shuffle
         Bitmap tnmn = BitmapFactory.decodeResource(getResources(), R.drawable.tmnt);
         Bitmap goku = BitmapFactory.decodeResource(getResources(), R.drawable.goku_ultra_instinct);
-        wallpapers = new Bitmap[]{tnmn, goku};
+        Bitmap cool = BitmapFactory.decodeResource(getResources(), R.drawable.cool_android_wallpaper_08);
+        Bitmap pexels = BitmapFactory.decodeResource(getResources(), R.drawable.pexels_photo_799443);
+
+        wallpapers = new Bitmap[]{tnmn, goku, cool, pexels};
         currWallpaperIndex = 0;
         //----- Setup for shuffle}
 
@@ -58,10 +62,10 @@ public class MainActivity extends AppCompatActivity {
         Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                changeWallpaperToTnmn(v);
-                changeWallpaperAfterSeconds(5);
                 changeWallpaperAfterSeconds(10);
-                changeWallpaperAfterSeconds(15);
+                changeWallpaperAfterSeconds(20);
+                changeWallpaperAfterSeconds(30);
+                changeWallpaperAfterSeconds(40);
             }
         });
     }
@@ -73,8 +77,15 @@ public class MainActivity extends AppCompatActivity {
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent _ )
             {
-                currWallpaperIndex = (currWallpaperIndex +1) %2;
                 changeWallpaper(wallpapers[currWallpaperIndex]);
+                currWallpaperIndex = (currWallpaperIndex +1) %wallpapers.length;
+
+                CharSequence text = "Changing wallpaper to "+currWallpaperIndex;
+                int duration = Toast.LENGTH_LONG;
+
+                Toast toast = Toast.makeText(context, text, duration);
+                toast.show();
+
                 context.unregisterReceiver( this ); // this == BroadcastReceiver, not Activity
             }
         };
