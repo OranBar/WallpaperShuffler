@@ -24,6 +24,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -83,10 +84,10 @@ public class MainActivity extends AppCompatActivity {
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 changeWallpaperToTnmn(v);
-                changeWallpaperAfterSeconds(10, false);
-                changeWallpaperAfterSeconds(20, false);
-                changeWallpaperAfterSeconds(30, false);
-                changeWallpaperAfterSeconds(40, false);
+                changeWallpaperAfterSeconds(1, true);
+                changeWallpaperAfterSeconds(10, true);
+//                changeWallpaperAfterSeconds(25, true);
+//                changeWallpaperAfterSeconds(35, true);
             }
         });
 
@@ -122,10 +123,12 @@ public class MainActivity extends AppCompatActivity {
 
                 if(pickFromMainImgList){
                     Set<String> images_set = loadMainImagesSet();
-                    String[] images = (String[]) images_set.toArray();
+                    ArrayList<String> images = new ArrayList<String>(images_set);
 
-                    newWallpaper = BitmapFactory.decodeFile(images[currWallpaperIndex]);
-                    currWallpaperIndex = (currWallpaperIndex +1) %images.length;
+                    String imagePath = images.get(currWallpaperIndex);
+
+                    newWallpaper = BitmapFactory.decodeFile(imagePath);
+                    currWallpaperIndex = (currWallpaperIndex +1) %images.size();
                 }else{
                     newWallpaper = wallpapers[currWallpaperIndex];
                     currWallpaperIndex = (currWallpaperIndex +1) %wallpapers.length;
