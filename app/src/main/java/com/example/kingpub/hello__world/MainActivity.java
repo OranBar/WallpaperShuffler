@@ -7,19 +7,26 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.SystemClock;
+import android.provider.MediaStore;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.util.HashSet;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -99,25 +106,6 @@ public class MainActivity extends AppCompatActivity {
         manager.set( AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000*seconds, pintent );
     }
 
-    public void SetAlarm()
-    {
-        final Button button = null; // replace with a button from your own UI
-        BroadcastReceiver receiver = new BroadcastReceiver() {
-            @Override public void onReceive(Context context, Intent _ )
-            {
-                button.setBackgroundColor( Color.RED );
-                context.unregisterReceiver( this ); // this == BroadcastReceiver, not Activity
-            }
-        };
-
-        this.registerReceiver( receiver, new IntentFilter("com.blah.blah.somemessage") );
-
-        PendingIntent pintent = PendingIntent.getBroadcast( this, 0, new Intent("com.blah.blah.somemessage"), 0 );
-        AlarmManager manager = (AlarmManager)(this.getSystemService( Context.ALARM_SERVICE ));
-
-        // set alarm to fire 5 sec (1000*5) from now (SystemClock.elapsedRealtime())
-        manager.set( AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000*5, pintent );
-    }
 
     public void changeWallpaper(View view, Bitmap bm){
         changeWallpaper(bm);
@@ -151,5 +139,88 @@ public class MainActivity extends AppCompatActivity {
 
         currWallpaperIndex = 1;
     }
+
+    private static int RESULT_LOAD_IMAGE = 1;
+
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.main);
+
+        Button buttonLoadImage = (Button) findViewById(R.id.buttonLoadPicture);
+        buttonLoadImage.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View arg0) {
+
+                Intent i = new Intent(
+                        Intent.ACTION_PICK,
+                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+
+                startActivityForResult(i, RESULT_LOAD_IMAGE);
+            }
+        });
+    }
+
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
+            Uri selectedImage = data.getData();
+            String[] filePathColumn = { MediaStore.Images.Media.DATA };
+
+            Cursor cursor = getContentResolver().query(selectedImage,
+                    filePathColumn, null, null, null);
+            cursor.moveToFirst();
+
+            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
+            String picturePath = cursor.getString(columnIndex);
+            cursor.close();
+
+            AddImageReferences(picturePath);
+
+//            ImageView imageView = (ImageView) findViewById(R.id.imgView);
+//            imageView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
+
+        }
+    }
+
+    public void AddImageReferences(String newImagePath) {
+        String image_set_key = "image_list_sharePref";
+        SharedPreferences sharedPref = getSharedPreferences("Images_List", Context.MODE_PRIVATE);
+
+        Set<String> images_set = sharedPref.getStringSet(image_set_key, new HashSet<String>());
+
+        images_set.add(newImagePath);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putStringSet(image_set_key, images_set);
+        editor.apply();
+    }
+
+    //non mi pare affidabilissimo sto timer. Magari per tempi pìù lunghi funzionerà bene uguale
+    public void SetAlarm()
+    {
+        final Button button = null; // replace with a button from your own UI
+        BroadcastReceiver receiver = new BroadcastReceiver() {
+            @Override public void onReceive(Context context, Intent _ )
+            {
+                button.setBackgroundColor( Color.RED );
+                context.unregisterReceiver( this ); // this == BroadcastReceiver, not Activity
+            }
+        };
+
+        this.registerReceiver( receiver, new IntentFilter("com.blah.blah.somemessage") );
+
+        PendingIntent pintent = PendingIntent.getBroadcast( this, 0, new Intent("com.blah.blah.somemessage"), 0 );
+        AlarmManager manager = (AlarmManager)(this.getSystemService( Context.ALARM_SERVICE ));
+
+        // set alarm to fire 5 sec (1000*5) from now (SystemClock.elapsedRealtime())
+        manager.set( AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000*5, pintent );
+    }
+
 
 }
