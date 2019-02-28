@@ -2,4 +2,6 @@
     <string name="app_name">Hello__World</string>
     <string name="mymsg">MyMsg</string>
     <string name="go">Go!</string>
+    <string name="main_image_list_key">com.kingpub.wallpapershuffler.image_setlist_sharePrefKey</string>
+    <string name="Images_Lists_SharedPrefName">Images_List</string>
 </resources>

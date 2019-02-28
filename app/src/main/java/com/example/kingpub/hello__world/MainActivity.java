@@ -20,17 +20,16 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final String EXTRA_MESSAGE = "com.example.kingpub.hello__world.MSG" ;
+    public static final String EXTRA_MESSAGE = "com.kingpub.wallpaperShuffler.MSG" ;
 
     //--- {vars for shuffle
     public Bitmap[] wallpapers;
@@ -52,6 +51,20 @@ public class MainActivity extends AppCompatActivity {
         currWallpaperIndex = 0;
         //----- Setup for shuffle}
 
+
+        Set<String> images_set = loadMainImagesSet();
+        String first = "None";
+        int totalImages = 0;
+        if(images_set != null && images_set.size() != 0){
+            first = images_set.iterator().next();
+            totalImages = images_set.size();
+        }
+        Toast toast = Toast.makeText(getApplicationContext(), totalImages+" Images total. First is "+first, Toast.LENGTH_LONG);
+        toast.show();
+
+
+
+        //------- {Buttons setup
         final Button changeWallpaper_btn1 = (Button) findViewById(R.id.WPbutton1);
         changeWallpaper_btn1.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -69,23 +82,57 @@ public class MainActivity extends AppCompatActivity {
         Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                changeWallpaperAfterSeconds(10);
-                changeWallpaperAfterSeconds(20);
-                changeWallpaperAfterSeconds(30);
-                changeWallpaperAfterSeconds(40);
+                changeWallpaperToTnmn(v);
+                changeWallpaperAfterSeconds(10, false);
+                changeWallpaperAfterSeconds(20, false);
+                changeWallpaperAfterSeconds(30, false);
+                changeWallpaperAfterSeconds(40, false);
             }
         });
+
+        Button addImageButton = (Button) findViewById(R.id.addImageButton);
+        addImageButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                pickPhotoFromPhone();
+            }
+        });
+        //------- Buttons setup}
     }
 
-    public void changeWallpaperAfterSeconds(int seconds){
+    private Set<String> loadMainImagesSet(){
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
+
+        Set<String> images_set = sharedPref.getStringSet(getString(R.string.main_image_list_key), new HashSet<String>());
+
+        return images_set;
+    }
+
+    public void changeWallpaperAfterSeconds(int seconds) {
+        changeWallpaperAfterSeconds(seconds, false);
+    }
+
+    public void changeWallpaperAfterSeconds(int seconds, final boolean pickFromMainImgList){
 
         Log.v("OBTask","ChangeWallpaperAfterSeconds");
 
         BroadcastReceiver receiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent _ )
             {
-                changeWallpaper(wallpapers[currWallpaperIndex]);
-                currWallpaperIndex = (currWallpaperIndex +1) %wallpapers.length;
+                Bitmap newWallpaper = null;
+
+                if(pickFromMainImgList){
+                    Set<String> images_set = loadMainImagesSet();
+                    String[] images = (String[]) images_set.toArray();
+
+                    newWallpaper = BitmapFactory.decodeFile(images[currWallpaperIndex]);
+                    currWallpaperIndex = (currWallpaperIndex +1) %images.length;
+                }else{
+                    newWallpaper = wallpapers[currWallpaperIndex];
+                    currWallpaperIndex = (currWallpaperIndex +1) %wallpapers.length;
+                }
+
+                changeWallpaper(newWallpaper);
+
 
                 CharSequence text = "Changing wallpaper to "+currWallpaperIndex;
                 int duration = Toast.LENGTH_LONG;
@@ -105,7 +152,6 @@ public class MainActivity extends AppCompatActivity {
         // set alarm to fire 5 sec (1000*5) from now (SystemClock.elapsedRealtime())
         manager.set( AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000*seconds, pintent );
     }
-
 
     public void changeWallpaper(View view, Bitmap bm){
         changeWallpaper(bm);
@@ -143,24 +189,29 @@ public class MainActivity extends AppCompatActivity {
     private static int RESULT_LOAD_IMAGE = 1;
 
 
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.main);
 
-        Button buttonLoadImage = (Button) findViewById(R.id.buttonLoadPicture);
-        buttonLoadImage.setOnClickListener(new View.OnClickListener() {
+    public void pickPhotoFromPhone() {
 
-            @Override
-            public void onClick(View arg0) {
+        Intent i = new Intent(
+                Intent.ACTION_PICK,
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
 
-                Intent i = new Intent(
-                        Intent.ACTION_PICK,
-                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(i, RESULT_LOAD_IMAGE);
 
-                startActivityForResult(i, RESULT_LOAD_IMAGE);
-            }
-        });
+
+//        Button buttonLoadImage = (Button) findViewById(R.id.buttonLoadPicture);
+//        buttonLoadImage.setOnClickListener(new View.OnClickListener() {
+//
+//            @Override
+//            public void onClick(View arg0) {
+//
+//                Intent i = new Intent(
+//                        Intent.ACTION_PICK,
+//                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+//
+//                startActivityForResult(i, RESULT_LOAD_IMAGE);
+//            }
+//        });
     }
 
 
@@ -180,7 +231,15 @@ public class MainActivity extends AppCompatActivity {
             String picturePath = cursor.getString(columnIndex);
             cursor.close();
 
+            File file = new File(picturePath);
+            String myFile = file.getParent() +"/"+ file.getName();
+
             AddImageReferences(picturePath);
+
+            int total_images = loadMainImagesSet().size();
+
+            Toast toast = Toast.makeText(getApplicationContext(), "Image reference to"+ myFile+" added. Total = "+total_images, Toast.LENGTH_LONG);
+            toast.show();
 
 //            ImageView imageView = (ImageView) findViewById(R.id.imgView);
 //            imageView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
@@ -189,15 +248,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void AddImageReferences(String newImagePath) {
-        String image_set_key = "image_list_sharePref";
-        SharedPreferences sharedPref = getSharedPreferences("Images_List", Context.MODE_PRIVATE);
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
 
-        Set<String> images_set = sharedPref.getStringSet(image_set_key, new HashSet<String>());
+        //Don't touch this variable. It will mess things up!
+        Set<String> loaded_set = sharedPref.getStringSet(getString(R.string.main_image_list_key), new HashSet<String>());
+        //----
+        Set<String> images_set = new HashSet<>(loaded_set);
 
         images_set.add(newImagePath);
 
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putStringSet(image_set_key, images_set);
+        editor.putStringSet(getString(R.string.main_image_list_key), images_set);
         editor.apply();
     }
 
