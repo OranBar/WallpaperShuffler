@@ -4,23 +4,19 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.WallpaperManager;
 import android.content.BroadcastReceiver;
-import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.media.MediaPlayer;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.provider.MediaStore;
 import android.support.v4.provider.DocumentFile;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -31,7 +27,6 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -105,16 +100,21 @@ public class MainActivity extends AppCompatActivity {
         Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                int imageSetLength =loadMainImagesSet().size();
+//                int imageSetLength = loadMainImagesSet().size();
+                Set<String> dirSet = loadDirSet();
+                int dirSetLength = dirSet.size();
 
-                Log("Starting Sequence : "+imageSetLength +" " +
+                //For now we take the first directory
+                DocumentFile[] dirFiles = getFilesFromDir( Uri.parse(dirSet.iterator().next() ));
+
+                Log("Starting Sequence : "+dirSetLength+" " +
                         "elements");
-                Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+imageSetLength+" elements", Toast.LENGTH_LONG);
+                Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
                 statrtSequenceToast.show();
 
 
-                for (int i=0; i<imageSetLength;i++){
-                    changeWallpaperAfterSeconds_2((10 * i) +1);
+                for (int i=0; i<dirFiles.length;i++){
+                    changeWallpaperAfterSeconds_Ultimate((10 * i) +1, dirFiles[i].getUri());
                 }
 
             }
@@ -172,6 +172,41 @@ public class MainActivity extends AppCompatActivity {
         Set<String> images_set = sharedPref.getStringSet(getString(R.string.main_images_paths_key), new HashSet<String>());
 
         return images_set;
+    }
+
+    private Set<String> loadDirSet(){
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
+
+        Set<String> images_set = sharedPref.getStringSet(getString(R.string.images_dirs_key), new HashSet<String>());
+
+        return images_set;
+    }
+
+    public void changeWallpaperAfterSeconds_Ultimate(int seconds, final Uri imageUri){
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap newWallpaper = null;
+
+                try {
+                    ContentResolver contentResolver = getContentResolver();
+                    InputStream is = null;
+                    is = contentResolver.openInputStream(imageUri);
+                    newWallpaper = BitmapFactory.decodeStream(is);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    return;
+                }
+
+                changeWallpaper(newWallpaper);
+
+                CharSequence text = "Changing wallpaper to "+imageUri.toString();
+                int duration = Toast.LENGTH_LONG;
+
+                Toast toast = Toast.makeText(getApplicationContext(), text, duration);
+                toast.show();
+            }
+        }, 1000 * seconds);
     }
 
     public void changeWallpaperAfterSeconds_2(int seconds) {
@@ -377,29 +412,43 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == RESULT_LOAD_FOLDER && resultCode == RESULT_OK && null != data) {
             Uri folderUri = data.getData();
+            AddDirReference(folderUri);
+        }
+    }
 
-            DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
+    private DocumentFile[] getFilesFromDir(Uri folderUri){
+        DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
 
-            ContentResolver contentResolver = getContentResolver();
+        ContentResolver contentResolver = getContentResolver();
 
-            for (DocumentFile file : documentFile.listFiles()) {
+        DocumentFile[] files = documentFile.listFiles();
+        return files;
+    }
 
-                if (file.isDirectory()) { // if it is sub directory
-                    // Do stuff with sub directory
-                } else {
-                    // Do stuff with normal file
-                    try {
-                        InputStream is = contentResolver.openInputStream(file.getUri());
-                        Bitmap myImage = BitmapFactory.decodeStream(is);
-                        String fileUri_str = file.getUri().toString();
-                        AddImageReferences_Path(fileUri_str);
+    private void selectWallpaperFromFolder(Uri folderUri){
+        DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
 
+        ContentResolver contentResolver = getContentResolver();
+
+        DocumentFile[] files = documentFile.listFiles();
+
+        ;  //For now, we pick first. Then, we do random
+
+        currWallpaperIndex = currWallpaperIndex+1;
+        DocumentFile file = files[ currWallpaperIndex%files.length ];
+
+        if (file.isDirectory()) { // if it is sub directory
+            // Do stuff with sub directory
+            Log("ERROR: Found dir instead of file");
+        } else {
+            // Do stuff with normal file
+            try {
+                InputStream is = contentResolver.openInputStream(file.getUri());
+                Bitmap myImage = BitmapFactory.decodeStream(is);
+                changeWallpaper(myImage);
 //                        changeWallpaper(myImage);
-                    } catch (Exception e) {
+            } catch (Exception e) {
 
-                    }
-                }
-                Log(file.getUri() + "\n");
             }
         }
     }
