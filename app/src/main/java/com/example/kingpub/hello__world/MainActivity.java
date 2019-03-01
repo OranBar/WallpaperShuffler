@@ -14,12 +14,17 @@ import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.media.MediaPlayer;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.support.v4.provider.DocumentFile;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.os.*;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -27,6 +32,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -101,12 +107,14 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 int imageSetLength =loadMainImagesSet().size();
 
-                Log("Starting Sequence : imageSetLength elements");
-                Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : imageSetLength elements", Toast.LENGTH_LONG);
-                statrtSequenceToast .show();
+                Log("Starting Sequence : "+imageSetLength +" " +
+                        "elements");
+                Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+imageSetLength+" elements", Toast.LENGTH_LONG);
+                statrtSequenceToast.show();
+
 
                 for (int i=0; i<imageSetLength;i++){
-                    changeWallpaperAfterSeconds((60 * i*2)+1, true);
+                    changeWallpaperAfterSeconds_2((10 * i) +1);
                 }
 
             }
@@ -161,9 +169,47 @@ public class MainActivity extends AppCompatActivity {
     private Set<String> loadMainImagesSet(){
         SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
 
-        Set<String> images_set = sharedPref.getStringSet(getString(R.string.main_image_list_key), new HashSet<String>());
+        Set<String> images_set = sharedPref.getStringSet(getString(R.string.main_images_paths_key), new HashSet<String>());
 
         return images_set;
+    }
+
+    public void changeWallpaperAfterSeconds_2(int seconds) {
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Bitmap newWallpaper = null;
+
+                Set<String> images_set = loadMainImagesSet();
+                ArrayList<String> imagesUris_str = new ArrayList<>(images_set);
+
+                String imageUri_str = imagesUris_str.get(currWallpaperIndex);
+                Uri imageUri = Uri.parse(imageUri_str);
+
+                ContentResolver contentResolver = getContentResolver();
+                InputStream is = null;
+                try {
+                    is = contentResolver.openInputStream(imageUri);
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                }
+                newWallpaper = BitmapFactory.decodeStream(is);
+
+//                newWallpaper = BitmapFactory.decodeFile(imagePath);
+
+                currWallpaperIndex = (currWallpaperIndex +1) %imagesUris_str.size();
+
+
+                changeWallpaper(newWallpaper);
+
+
+                CharSequence text = "Changing wallpaper to "+currWallpaperIndex;
+                int duration = Toast.LENGTH_LONG;
+
+                Toast toast = Toast.makeText(getApplicationContext(), text, duration);
+                toast.show();
+            }
+        }, 1000 * seconds);
     }
 
     public void changeWallpaperAfterSeconds(int seconds) {
@@ -241,6 +287,9 @@ public class MainActivity extends AppCompatActivity {
         try {
             wallpaperManager.setBitmap(bm);
             wallpaperManager.setBitmap(bm, null ,true, WallpaperManager.FLAG_LOCK);
+            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+            r.play();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -322,7 +371,6 @@ public class MainActivity extends AppCompatActivity {
 //        });
     }
 
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -342,7 +390,7 @@ public class MainActivity extends AppCompatActivity {
             File file = new File(picturePath);
             String myFile = file.getParent() + "/" + file.getName();
 
-            AddImageReferences(picturePath);
+            AddImageReferences_Path(picturePath);
 
             int total_images = loadMainImagesSet().size();
 
@@ -373,7 +421,7 @@ public class MainActivity extends AppCompatActivity {
 
             DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
 
-            boolean flag = true;
+            ContentResolver contentResolver = getContentResolver();
 
             for (DocumentFile file : documentFile.listFiles()) {
 
@@ -381,37 +429,57 @@ public class MainActivity extends AppCompatActivity {
                     // Do stuff with sub directory
                 } else {
                     // Do stuff with normal file
-                }
-
-                Log(file.getUri() + "\n");
-
-                if (flag) {
-                    ContentResolver contentResolver = getContentResolver();
                     try {
                         InputStream is = contentResolver.openInputStream(file.getUri());
                         Bitmap myImage = BitmapFactory.decodeStream(is);
-                        changeWallpaper(myImage);
+                        String fileUri_str = file.getUri().toString();
+                        AddImageReferences_Path(fileUri_str);
+
+//                        changeWallpaper(myImage);
                     } catch (Exception e) {
 
                     }
-                    flag = false;
                 }
+                Log(file.getUri() + "\n");
             }
         }
     }
 
-    public void AddImageReferences(String newImagePath) {
+//    public void AddAllImagesFromFolder(Uri folderUri){
+//
+////        TraverseFolder(folderUri, opOnFile);
+//
+//    }
+
+//    private void TraverseFolder(Uri folderUri, Consumer<DocumentFile> operationOnFile){
+//        DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
+//
+//        for (DocumentFile file : documentFile.listFiles()) {
+//
+//            if (file.isDirectory()) { // if it is sub directory
+//                continue;
+//                //Maybe here we would start reading files recursively. But for now let's not
+//            } else {
+//                // Do stuff with normal file
+//                operationOnFile.accept(file);   //Functional!
+//            }
+//
+//            Log(file.getUri() + "\n");
+//        }
+//    }
+
+    public void AddImageReferences_Path(String newImagePath) {
         SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
 
         //Don't touch this variable. It will mess things up!
-        Set<String> loaded_set = sharedPref.getStringSet(getString(R.string.main_image_list_key), new HashSet<String>());
+        Set<String> loaded_set = sharedPref.getStringSet(getString(R.string.main_images_paths_key), new HashSet<String>());
         //----
         Set<String> images_set = new HashSet<>(loaded_set);
 
         images_set.add(newImagePath);
 
         SharedPreferences.Editor editor = sharedPref.edit();
-        editor.putStringSet(getString(R.string.main_image_list_key), images_set);
+        editor.putStringSet(getString(R.string.main_images_paths_key), images_set);
         editor.apply();
     }
 
