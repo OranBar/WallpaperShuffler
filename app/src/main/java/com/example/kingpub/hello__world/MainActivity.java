@@ -4,6 +4,8 @@ import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.app.WallpaperManager;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -15,15 +17,18 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.SystemClock;
 import android.provider.MediaStore;
+import android.support.v4.provider.DocumentFile;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,10 +37,22 @@ public class MainActivity extends AppCompatActivity {
 
     public static final String EXTRA_MESSAGE = "com.kingpub.wallpaperShuffler.MSG" ;
 
+
     //--- {vars for shuffle
     public Bitmap[] wallpapers;
     public int currWallpaperIndex = 0;
     //----- vars for shuffle}
+
+    private static ArrayList<BroadcastReceiver> CURRENT_ACTIVE_RECIEVERS = new ArrayList<BroadcastReceiver>();
+    private TextView console;
+    private Button[] consoleButtons;
+
+    private void Log(String arg){
+        String consoleText = console.getText().toString();
+        consoleText = consoleText + arg;
+        console.setText(consoleText);
+        Log.v("ObLog", arg);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,19 +70,18 @@ public class MainActivity extends AppCompatActivity {
         //----- Setup for shuffle}
 
 
-        Set<String> images_set = loadMainImagesSet();
-        String first = "None";
-        int totalImages = 0;
-        if(images_set != null && images_set.size() != 0){
-            first = images_set.iterator().next();
-            totalImages = images_set.size();
-        }
-        Toast toast = Toast.makeText(getApplicationContext(), totalImages+" Images total. First is "+first, Toast.LENGTH_LONG);
-        toast.show();
+        displayTotalImagesToast();
+
+        SetupConsoleButtons();
+
+        final Button test = (Button) findViewById(R.id.test);
+        test.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                pickMultiplePictures();
+            }
+        });
 
 
-
-        //------- {Buttons setup
         final Button changeWallpaper_btn1 = (Button) findViewById(R.id.WPbutton1);
         changeWallpaper_btn1.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
@@ -83,11 +99,16 @@ public class MainActivity extends AppCompatActivity {
         Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                changeWallpaperToTnmn(v);
-                changeWallpaperAfterSeconds(1, true);
-                changeWallpaperAfterSeconds(10, true);
-//                changeWallpaperAfterSeconds(25, true);
-//                changeWallpaperAfterSeconds(35, true);
+                int imageSetLength =loadMainImagesSet().size();
+
+                Log("Starting Sequence : imageSetLength elements");
+                Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : imageSetLength elements", Toast.LENGTH_LONG);
+                statrtSequenceToast .show();
+
+                for (int i=0; i<imageSetLength;i++){
+                    changeWallpaperAfterSeconds((60 * i*2)+1, true);
+                }
+
             }
         });
 
@@ -98,6 +119,43 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         //------- Buttons setup}
+    }
+
+    private void SetupConsoleButtons() {
+        console = (TextView) findViewById(R.id.console_textview);
+
+        consoleButtons = new Button[3];
+        consoleButtons[0] = (Button) findViewById(R.id.ConsoleBtn1);
+        consoleButtons[1] = (Button) findViewById(R.id.ConsoleBtn2);
+        consoleButtons[2] = (Button) findViewById(R.id.ConsoleBtn3);
+
+        //------- {Buttons setup
+
+        consoleButtons[0].setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                displayTotalImagesToast();
+            }
+        });
+        consoleButtons[0].setText("Tot_Imgs");
+
+        consoleButtons[1].setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                pickFolder();
+            }
+        });
+        consoleButtons[1].setText("Pick Folder");
+    }
+
+    private void displayTotalImagesToast() {
+        Set<String> images_set = loadMainImagesSet();
+        String first = "None";
+        int totalImages = 0;
+        if(images_set != null && images_set.size() != 0){
+            first = images_set.iterator().next();
+            totalImages = images_set.size();
+        }
+        Toast toast = Toast.makeText(getApplicationContext(), totalImages+" Images total. First is "+first, Toast.LENGTH_LONG);
+        toast.show();
     }
 
     private Set<String> loadMainImagesSet(){
@@ -144,10 +202,13 @@ public class MainActivity extends AppCompatActivity {
                 toast.show();
 
                 context.unregisterReceiver( this ); // this == BroadcastReceiver, not Activity
+                CURRENT_ACTIVE_RECIEVERS.remove(this);
             }
         };
 
         this.registerReceiver( receiver, new IntentFilter("com.example.kingpub.hello__world.Scheduled_WallpaperChange") );
+
+        CURRENT_ACTIVE_RECIEVERS.add(receiver);
 
         PendingIntent pintent = PendingIntent.getBroadcast( this, 0, new Intent("com.example.kingpub.hello__world.Scheduled_WallpaperChange"), 0 );
         AlarmManager manager = (AlarmManager)(this.getSystemService( Context.ALARM_SERVICE ));
@@ -155,6 +216,17 @@ public class MainActivity extends AppCompatActivity {
         // set alarm to fire 5 sec (1000*5) from now (SystemClock.elapsedRealtime())
         manager.set( AlarmManager.ELAPSED_REALTIME_WAKEUP, SystemClock.elapsedRealtime() + 1000*seconds, pintent );
     }
+
+//    @Override
+//    protected void onStop()
+//    {
+//        for(BroadcastReceiver curr : CURRENT_ACTIVE_RECIEVERS ){
+//            try{
+//                unregisterReceiver(curr);
+//            }catch(IllegalArgumentException e){ ; }
+//        }
+//        super.onStop();
+//    }
 
     public void changeWallpaper(View view, Bitmap bm){
         changeWallpaper(bm);
@@ -189,8 +261,41 @@ public class MainActivity extends AppCompatActivity {
         currWallpaperIndex = 1;
     }
 
-    private static int RESULT_LOAD_IMAGE = 1;
+    private static final int RESULT_LOAD_IMAGE = 1;
+    private static final int RESULT_LOAD_MULTIPLE_IMAGES = 2;
+    private static final int RESULT_LOAD_FOLDER = 3;
 
+    public void pickFolder(){
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        startActivityForResult(intent, RESULT_LOAD_FOLDER);
+    }
+
+    public void pickMultiplePictures() {
+
+        Intent i = new Intent(
+                Intent.ACTION_GET_CONTENT
+//                ,android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        );
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        i.setType("*/*");
+
+        startActivityForResult(i, RESULT_LOAD_MULTIPLE_IMAGES);
+
+
+//        Button buttonLoadImage = (Button) findViewById(R.id.buttonLoadPicture);
+//        buttonLoadImage.setOnClickListener(new View.OnClickListener() {
+//
+//            @Override
+//            public void onClick(View arg0) {
+//
+//                Intent i = new Intent(
+//                        Intent.ACTION_PICK,
+//                        android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+//
+//                startActivityForResult(i, RESULT_LOAD_IMAGE);
+//            }
+//        });
+    }
 
 
     public void pickPhotoFromPhone() {
@@ -224,7 +329,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
             Uri selectedImage = data.getData();
-            String[] filePathColumn = { MediaStore.Images.Media.DATA };
+            String[] filePathColumn = {MediaStore.Images.Media.DATA};
 
             Cursor cursor = getContentResolver().query(selectedImage,
                     filePathColumn, null, null, null);
@@ -235,18 +340,63 @@ public class MainActivity extends AppCompatActivity {
             cursor.close();
 
             File file = new File(picturePath);
-            String myFile = file.getParent() +"/"+ file.getName();
+            String myFile = file.getParent() + "/" + file.getName();
 
             AddImageReferences(picturePath);
 
             int total_images = loadMainImagesSet().size();
 
-            Toast toast = Toast.makeText(getApplicationContext(), "Image reference to"+ myFile+" added. Total = "+total_images, Toast.LENGTH_LONG);
+            Toast toast = Toast.makeText(getApplicationContext(), "Image reference to" + myFile + " added. Total = " + total_images, Toast.LENGTH_LONG);
             toast.show();
 
 //            ImageView imageView = (ImageView) findViewById(R.id.imgView);
 //            imageView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
 
+        }
+
+        if (requestCode == RESULT_LOAD_MULTIPLE_IMAGES && resultCode == RESULT_OK && null != data) {
+            ClipData clipData = data.getClipData();
+
+            for (int i = 0; i < clipData.getItemCount(); i++) {
+                ClipData.Item currItem = clipData.getItemAt(i);
+                Uri currUri = currItem.getUri();
+                Log("Current URI " + currUri);
+            }
+
+//            Uri selectedFolder = data.getData();
+//
+//            Log("Path = "+selectedFolder.getPath());
+        }
+
+        if (requestCode == RESULT_LOAD_FOLDER && resultCode == RESULT_OK && null != data) {
+            Uri folderUri = data.getData();
+
+            DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
+
+            boolean flag = true;
+
+            for (DocumentFile file : documentFile.listFiles()) {
+
+                if (file.isDirectory()) { // if it is sub directory
+                    // Do stuff with sub directory
+                } else {
+                    // Do stuff with normal file
+                }
+
+                Log(file.getUri() + "\n");
+
+                if (flag) {
+                    ContentResolver contentResolver = getContentResolver();
+                    try {
+                        InputStream is = contentResolver.openInputStream(file.getUri());
+                        Bitmap myImage = BitmapFactory.decodeStream(is);
+                        changeWallpaper(myImage);
+                    } catch (Exception e) {
+
+                    }
+                    flag = false;
+                }
+            }
         }
     }
 
