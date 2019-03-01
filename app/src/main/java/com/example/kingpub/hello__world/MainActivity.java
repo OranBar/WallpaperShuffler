@@ -375,47 +375,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == RESULT_LOAD_IMAGE && resultCode == RESULT_OK && null != data) {
-            Uri selectedImage = data.getData();
-            String[] filePathColumn = {MediaStore.Images.Media.DATA};
-
-            Cursor cursor = getContentResolver().query(selectedImage,
-                    filePathColumn, null, null, null);
-            cursor.moveToFirst();
-
-            int columnIndex = cursor.getColumnIndex(filePathColumn[0]);
-            String picturePath = cursor.getString(columnIndex);
-            cursor.close();
-
-            File file = new File(picturePath);
-            String myFile = file.getParent() + "/" + file.getName();
-
-            AddImageReferences_Path(picturePath);
-
-            int total_images = loadMainImagesSet().size();
-
-            Toast toast = Toast.makeText(getApplicationContext(), "Image reference to" + myFile + " added. Total = " + total_images, Toast.LENGTH_LONG);
-            toast.show();
-
-//            ImageView imageView = (ImageView) findViewById(R.id.imgView);
-//            imageView.setImageBitmap(BitmapFactory.decodeFile(picturePath));
-
-        }
-
-        if (requestCode == RESULT_LOAD_MULTIPLE_IMAGES && resultCode == RESULT_OK && null != data) {
-            ClipData clipData = data.getClipData();
-
-            for (int i = 0; i < clipData.getItemCount(); i++) {
-                ClipData.Item currItem = clipData.getItemAt(i);
-                Uri currUri = currItem.getUri();
-                Log("Current URI " + currUri);
-            }
-
-//            Uri selectedFolder = data.getData();
-//
-//            Log("Path = "+selectedFolder.getPath());
-        }
-
         if (requestCode == RESULT_LOAD_FOLDER && resultCode == RESULT_OK && null != data) {
             Uri folderUri = data.getData();
 
@@ -480,6 +439,22 @@ public class MainActivity extends AppCompatActivity {
 
         SharedPreferences.Editor editor = sharedPref.edit();
         editor.putStringSet(getString(R.string.main_images_paths_key), images_set);
+        editor.apply();
+    }
+
+    public void AddDirReference(Uri directoryUri) {
+        String directoryUri_str = directoryUri.toString();
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
+
+        //Don't touch this variable. It will mess things up!
+        Set<String> loaded_set = sharedPref.getStringSet(getString(R.string.images_dirs_key), new HashSet<String>());
+        //----
+        Set<String> images_set = new HashSet<>(loaded_set);
+
+        images_set.add(directoryUri_str);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.putStringSet(getString(R.string.images_dirs_key), images_set);
         editor.apply();
     }
 
