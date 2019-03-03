@@ -1,7 +1,6 @@
 package com.example.kingpub.hello__world;
 
 import android.app.WallpaperManager;
-import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
@@ -25,9 +24,14 @@ import android.widget.Toast;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+
+import androidx.work.Data;
+import androidx.work.OneTimeWorkRequest;
+import androidx.work.WorkContinuation;
+import androidx.work.WorkManager;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -116,10 +120,28 @@ public class MainActivity extends AppCompatActivity {
                 Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
                 statrtSequenceToast.show();
 
+                Intent changeWallpaper_intent = new Intent(getApplicationContext(), WallpaperService.class);
 
-                for (int i=0; i < dirSetLength; i++){
-                    changeWallpaperAfterSeconds((10 * i) +1, dirFiles[i].getUri());
+                String[] wallpaperUris_str = new String[5];
+                for(int i=0; i<5; i++){
+                    wallpaperUris_str[i] = dirFiles[i].getUri().toString();
                 }
+
+                changeWallpaper_intent.putExtra(WallpaperService.WALLPAPER_URIS, wallpaperUris_str);
+                startService(changeWallpaper_intent);
+
+//                OneTimeWorkRequest firstRequest = changeWallpaperAfterSeconds_WorkManager(11, dirFiles[0].getUri());
+//                WorkContinuation continuation = WorkManager.getInstance().beginWith(firstRequest);
+//
+//                continuation.then(changeWallpaperAfterSeconds_WorkManager(11, dirFiles[1].getUri()));
+//                continuation.then(changeWallpaperAfterSeconds_WorkManager(11, dirFiles[2].getUri()));
+//
+//                continuation.enqueue();
+
+
+//                for (int i=0; i < dirSetLength; i++){
+//                    changeWallpaperAfterSeconds_WorkManager((10 * i) +1, dirFiles[i].getUri());
+//                }
 
             }
         });
@@ -164,6 +186,21 @@ public class MainActivity extends AppCompatActivity {
         Set<String> images_set = sharedPref.getStringSet(getString(R.string.images_dirs_key), new HashSet<String>());
 
         return images_set;
+    }
+
+    public OneTimeWorkRequest changeWallpaperAfterSeconds_WorkManager(int seconds, final Uri imageUri){
+
+        Data uri_data = new Data.Builder()
+                .putString(ChangeWallpaper_Worker.IMG_URI_STR_KEY, imageUri.toString())
+                .build();
+
+        OneTimeWorkRequest myWork =
+                new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
+                        .setInputData(uri_data)
+                        .setInitialDelay(seconds, TimeUnit.SECONDS)// Use this when you want to add initial delay or schedule initial work to `OneTimeWorkRequest` e.g. setInitialDelay(2, TimeUnit.HOURS)
+        .build();
+
+        return myWork;
     }
 
     public void changeWallpaperAfterSeconds(int seconds, final Uri imageUri){
