@@ -21,16 +21,21 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.common.util.concurrent.ListenableFuture;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import androidx.work.Data;
+import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
-import androidx.work.WorkContinuation;
+import androidx.work.PeriodicWorkRequest;
+import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 
 public class MainActivity extends AppCompatActivity {
@@ -44,6 +49,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView console;
     private Button[] consoleButtons;
 
+    PeriodicWorkRequest changeWallpaper_work = null;
+
     private void Log(String arg){
         String consoleText = console.getText().toString();
         consoleText = consoleText + arg;
@@ -56,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+
         currWallpaperIndex = 0;
         //----- Setup for shuffle}
 //        displayTotalImagesToast();
@@ -66,7 +74,7 @@ public class MainActivity extends AppCompatActivity {
     private void BindOnClick_AndChangeNames_OfAllButtons() {
         BindOnClick_AndChangeNames_OfConsoleButtons();
         BindOnClick_OfChangeButton();
-        BindOnClick_OfAddImage();
+        BindOnClick_OfStopper();
         BindOnClick_AndChangeNames_OfTestButton();
     }
 
@@ -105,30 +113,47 @@ public class MainActivity extends AppCompatActivity {
 //        consoleButtons[2].setText("Pick Folder");
     }
 
+    private Data m_uri_data;
+
     private void BindOnClick_OfChangeButton(){
-        Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
+        final Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 Set<String> dirSet = loadDirSet();
 
                 //For now we take the first directory
-                DocumentFile[] dirFiles = getFilesFromDir( Uri.parse(dirSet.iterator().next() ));
+                Uri firstDirectoryUri = Uri.parse(dirSet.iterator().next());
+                DocumentFile[] dirFiles = getFilesFromDir( firstDirectoryUri );
                 int dirSetLength = dirFiles.length;
 
                 Log("Starting Sequence : "+dirSetLength+" " +
                         "elements");
-                Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
-                statrtSequenceToast.show();
+                Toast startSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
+                startSequenceToast.show();
 
-                Intent changeWallpaper_intent = new Intent(getApplicationContext(), WallpaperService.class);
+                m_uri_data = new Data.Builder()
+                        .putString(ChangeWallpaper_Worker.DIR_URI_STR_KEY, firstDirectoryUri.toString())
+                        .build();
 
-                String[] wallpaperUris_str = new String[5];
-                for(int i=0; i<5; i++){
-                    wallpaperUris_str[i] = dirFiles[i].getUri().toString();
-                }
+                changeWallpaper_work = new PeriodicWorkRequest.Builder(ChangeWallpaper_Worker.class, 15, TimeUnit.MINUTES, 1, TimeUnit.MINUTES)
+                        .setInputData(m_uri_data)
+                        .addTag("WC")
+                        .build();
 
-                changeWallpaper_intent.putExtra(WallpaperService.WALLPAPER_URIS, wallpaperUris_str);
-                startService(changeWallpaper_intent);
+//                WorkManager.getInstance().enqueue(changeWallpaper_work);
+                WorkManager.getInstance().enqueueUniquePeriodicWork("ChangeWallpaper_Loop", ExistingPeriodicWorkPolicy.REPLACE, changeWallpaper_work);
+
+                Log.v("OBTask", "Started Work "+changeWallpaper_work.getId());
+
+//                Intent changeWallpaper_intent = new Intent(getApplicationContext(), WallpaperService.class);
+//
+//                String[] wallpaperUris_str = new String[5];
+//                for(int i=0; i<5; i++){
+//                    wallpaperUris_str[i] = dirFiles[i].getUri().toString();
+//                }
+//
+//                changeWallpaper_intent.putExtra(WallpaperService.WALLPAPER_URIS, wallpaperUris_str);
+//                startService(changeWallpaper_intent);
 
 //                OneTimeWorkRequest firstRequest = changeWallpaperAfterSeconds_WorkManager(11, dirFiles[0].getUri());
 //                WorkContinuation continuation = WorkManager.getInstance().beginWith(firstRequest);
@@ -147,13 +172,41 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void BindOnClick_OfAddImage() {
+    private void BindOnClick_OfStopper() {
         Button addImageButton = (Button) findViewById(R.id.addImageButton);
         addImageButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                //Do Nothing
+                //Tag
+                Log.v("OBTask", "My Work is "+WorkManager.getInstance().getWorkInfosByTag("WC").toString());
+                Log.v("OBTask", "Is Canceled = "+WorkManager.getInstance().getWorkInfosByTag("WC").isCancelled());
+                Log.v("OBTask", "Is Done = "+WorkManager.getInstance().getWorkInfosByTag("WC").isDone());
+
+                if(WorkManager.getInstance().getWorkInfosByTag("WC").cancel(true)){
+                    Log.v("OBTasks", "Second attempt to kill service");
+                    WorkManager.getInstance().pruneWork();
+                }
+
+                Log.v("OBTask", "--My Work is "+WorkManager.getInstance().getWorkInfosByTag("WC").toString());
+                Log.v("OBTask", "--Is Canceled = "+WorkManager.getInstance().getWorkInfosByTag("WC").isCancelled());
+                Log.v("OBTask", "--Is Done = "+WorkManager.getInstance().getWorkInfosByTag("WC").isDone());
+                //------------------------
+
+                ListenableFuture<List<WorkInfo>> info = WorkManager.getInstance().getWorkInfosForUniqueWork("ChangeWallpaper_Loop");
+                Log.v("OBTask", "(Unique) My Work is "+info.toString());
+                Log.v("OBTask", "(Unique) Is Canceled = "+info.isCancelled());
+                Log.v("OBTask", "(Unique) Is Done = "+info.isDone());
+
+                WorkManager.getInstance().cancelUniqueWork("ChangeWallpaper_Loop");
+                WorkManager.getInstance().pruneWork();
+
+                Log.v("OBTask", "--(Unique) My Work is "+info.toString());
+                Log.v("OBTask", "--(Unique) Is Canceled = "+info.isCancelled());
+                Log.v("OBTask", "--(Unique) Is Done = "+info.isDone());
+
+                Log.v("OBTask","Stopped Wallpaper change task??");
             }
         });
+        addImageButton.setText("Stopper");
     }
 
     private void BindOnClick_AndChangeNames_OfTestButton() {
@@ -161,9 +214,29 @@ public class MainActivity extends AppCompatActivity {
         final Button test = (Button) findViewById(R.id.test);
         test.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                //Do Nothing
+                Log.v("OBTask", "My Work is "+WorkManager.getInstance().getWorkInfosByTag("WC").toString());
+                Log.v("OBTask", "Is Canceled = "+WorkManager.getInstance().getWorkInfosByTag("WC").isCancelled());
+                Log.v("OBTask", "Is Done = "+WorkManager.getInstance().getWorkInfosByTag("WC").isDone());
+
+                ListenableFuture<List<WorkInfo>> info = WorkManager.getInstance().getWorkInfosForUniqueWork("ChangeWallpaper_Loop");
+
+                Log.v("OBTask", "(Unique) My Work is "+info.toString());
+                Log.v("OBTask", "(Unique) Is Canceled = "+info.isCancelled());
+                Log.v("OBTask", "(Unique) Is Done = "+info.isDone());
+
+                WorkManager.getInstance().cancelAllWork();
+
+                Log.v("OBTask", "--My Work is "+WorkManager.getInstance().getWorkInfosByTag("WC").toString());
+                Log.v("OBTask", "--Is Canceled = "+WorkManager.getInstance().getWorkInfosByTag("WC").isCancelled());
+                Log.v("OBTask", "--Is Done = "+WorkManager.getInstance().getWorkInfosByTag("WC").isDone());
+
+                Log.v("OBTask", "--(Unique) My Work is "+info.toString());
+                Log.v("OBTask", "--(Unique) Is Canceled = "+info.isCancelled());
+                Log.v("OBTask", "--(Unique) Is Done = "+info.isDone());
             }
         });
+        test.setText("SuperStopper");
+
 
     }
 

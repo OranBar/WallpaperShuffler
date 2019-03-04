@@ -1,5 +1,6 @@
 package com.example.kingpub.hello__world;
 
+import android.app.NotificationManager;
 import android.app.WallpaperManager;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -9,10 +10,11 @@ import android.graphics.BitmapFactory;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.v4.provider.DocumentFile;
+import android.support.v7.app.NotificationCompat;
 import android.util.Log;
-import android.view.View;
 import android.widget.Toast;
 
 import java.io.FileNotFoundException;
@@ -31,21 +33,51 @@ import androidx.work.WorkerParameters;
 public class ChangeWallpaper_Worker extends Worker {
 
     public static final String IMG_URI_STR_KEY = "IMG_URI";
+    public static final String DIR_URI_STR_KEY = "DIR_URI";
 
-    private int index;
+    private String workrequestId = "";
+
 
     public ChangeWallpaper_Worker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
-        index=0;
+        Log.v("OBChangeWallpaper", "Create");
+        workrequestId = " (WorkRequestId= "+this.getId()+")";
     }
+//    @NonNull
+//    @Override
+//    public Result doWork() {
+//
+//        String wallpaperUriToSet_str = getInputData().getString(IMG_URI_STR_KEY);
+//
+//        Uri wallpaperUriToSet = Uri.parse(wallpaperUriToSet_str);
+//        changeWallpaper(getBitmapFromImageUri(wallpaperUriToSet));
+//
+//        return Result.success();
+//    }
+
+    private static int Current_Index = -1;
+
+
 
     @NonNull
     @Override
     public Result doWork() {
+        Log.v("OBChangeWallpaper","Starting change sequence"+workrequestId);
+        String dirUri_str = getInputData().getString(DIR_URI_STR_KEY);
 
-        String wallpaperUriToSet_str = getInputData().getString(IMG_URI_STR_KEY);
+        if(Uri.parse(dirUri_str) == null){
+            Log.e("OBError", "String param (="+dirUri_str+")is an invalid Uri.");
+            return Result.failure();
+        }
 
-        Uri wallpaperUriToSet = Uri.parse(wallpaperUriToSet_str);
+        Log.v("OBChangeWallpaper","Dir uri is "+dirUri_str+workrequestId);
+
+        DocumentFile[] files = getFilesFromDir(Uri.parse(dirUri_str));
+
+        Current_Index++;
+        Uri wallpaperUriToSet = files[Current_Index %files.length].getUri();
+
+        Log.v("OBChangeWallpaper","Chosen wallpaper uri is "+wallpaperUriToSet+workrequestId);
         changeWallpaper(getBitmapFromImageUri(wallpaperUriToSet));
 
         return Result.success();
@@ -53,20 +85,25 @@ public class ChangeWallpaper_Worker extends Worker {
 
     public void changeWallpaper(Bitmap bm){
 
-        Log.v("OBTask","ChangeWallpaper!");
+        Log.v("OBTask","Changing Wallpaper!"+workrequestId);
 
         WallpaperManager wallpaperManager =  WallpaperManager.getInstance(getApplicationContext());
 
         try {
-            wallpaperManager.setBitmap(bm);
             wallpaperManager.setBitmap(bm, null ,true, WallpaperManager.FLAG_LOCK);
-            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-            Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
-            r.play();
+            wallpaperManager.setBitmap(bm);
+            Log.v("OBTask", "Change Wallpaper Successful"+workrequestId);
         } catch (IOException e) {
             e.printStackTrace();
+            Log.e("OBTask", "Change Wallpaper FAILED"+workrequestId);
         }
+
+        Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+        r.play();
     }
+
+
 
     private Bitmap getBitmapFromImageUri(Uri imageUri){
         Bitmap newWallpaper = null;
@@ -108,7 +145,7 @@ public class ChangeWallpaper_Worker extends Worker {
         Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
         statrtSequenceToast.show();
 
-        index = index+1;
+        Current_Index = Current_Index +1;
 
     }
 

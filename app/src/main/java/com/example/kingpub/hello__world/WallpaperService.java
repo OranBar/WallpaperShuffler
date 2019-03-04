@@ -24,6 +24,9 @@ public class WallpaperService extends IntentService {
 
     public static final String WALLPAPER_URIS = "WALLPAPER_URIS";
 
+    private Handler handler = new Handler();
+    public static volatile boolean shouldStop = false;
+
     public WallpaperService() {
         super("OB_Wallpaper_Service");
     }
@@ -45,14 +48,13 @@ public class WallpaperService extends IntentService {
         foo(wallpperUris_str, 0);
     }
 
-    private Handler handler = new Handler();
 
     private void foo (final String[] wallpaperUris_str, final int index){
 
         Log.v("OB","foo "+index);
         final Uri wallpaperUri = Uri.parse(wallpaperUris_str[index]);
 
-        final boolean keepGoing = index < wallpaperUris_str.length; //Add more stoppers?
+        final boolean keepGoing = index < wallpaperUris_str.length && shouldStop == false; //Add more stoppers?
 
         handler.postDelayed(
                 new Runnable() {
