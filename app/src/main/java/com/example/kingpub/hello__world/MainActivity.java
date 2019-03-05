@@ -91,10 +91,20 @@ public class MainActivity extends AppCompatActivity {
         //First
         consoleButtons[0].setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                //Do Nothing
+
+                int total = 0;
+                for(String uri_str : loadDirSet()){
+                    total += getFilesFromDir(Uri.parse(uri_str)).length;
+                }
+
+                Toast startSequenceToast = Toast.makeText(getApplicationContext(), "Total Directories: "+loadDirSet().size()+"\nTotal Images: "+total, Toast.LENGTH_LONG);
+                startSequenceToast.show();
+
+                Log.v("OBTask", "Total Directories: "+loadDirSet().size()+"\nTotal Images: "+total);
+
             }
         });
-        consoleButtons[0].setText("Tot_Imgs");
+        consoleButtons[0].setText("Tot_Dirs/Imgs");
 
         //Second
         consoleButtons[1].setOnClickListener(new View.OnClickListener() {
@@ -133,6 +143,7 @@ public class MainActivity extends AppCompatActivity {
 
                 m_uri_data = new Data.Builder()
                         .putString(ChangeWallpaper_Worker.DIR_URI_STR_KEY, firstDirectoryUri.toString())
+                        .putStringArray(ChangeWallpaper_Worker.DIR_LIST_URIS_STR_KEY, (dirSet.toArray(new String[0])))
                         .build();
 
                 changeWallpaper_work = new PeriodicWorkRequest.Builder(ChangeWallpaper_Worker.class, 15, TimeUnit.MINUTES, 1, TimeUnit.MINUTES)

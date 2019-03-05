@@ -1,6 +1,5 @@
 package com.example.kingpub.hello__world;
 
-import android.app.NotificationManager;
 import android.app.WallpaperManager;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -10,10 +9,8 @@ import android.graphics.BitmapFactory;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
-import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.v4.provider.DocumentFile;
-import android.support.v7.app.NotificationCompat;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -21,6 +18,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +32,7 @@ public class ChangeWallpaper_Worker extends Worker {
 
     public static final String IMG_URI_STR_KEY = "IMG_URI";
     public static final String DIR_URI_STR_KEY = "DIR_URI";
+    public static final String DIR_LIST_URIS_STR_KEY = "DIR_LIST_URIS";
 
     private String workrequestId = "";
 
@@ -57,13 +56,13 @@ public class ChangeWallpaper_Worker extends Worker {
 
     private static int Current_Index = -1;
 
-
-
     @NonNull
     @Override
     public Result doWork() {
         Log.v("OBChangeWallpaper","Starting change sequence"+workrequestId);
         String dirUri_str = getInputData().getString(DIR_URI_STR_KEY);
+
+        String[] dirsUris_str = getInputData().getStringArray(DIR_LIST_URIS_STR_KEY);
 
         if(Uri.parse(dirUri_str) == null){
             Log.e("OBError", "String param (="+dirUri_str+")is an invalid Uri.");
@@ -72,15 +71,49 @@ public class ChangeWallpaper_Worker extends Worker {
 
         Log.v("OBChangeWallpaper","Dir uri is "+dirUri_str+workrequestId);
 
-        DocumentFile[] files = getFilesFromDir(Uri.parse(dirUri_str));
+//        DocumentFile[] files = getFilesFromDir(Uri.parse(dirUri_str));
+//
+//        Current_Index++;
+//        Uri wallpaperUriToSet = files[Current_Index %files.length].getUri();
 
-        Current_Index++;
-        Uri wallpaperUriToSet = files[Current_Index %files.length].getUri();
+        Uri wallpaperUriToSet = pickWallpaperFromFolders(dirsUris_str);
 
         Log.v("OBChangeWallpaper","Chosen wallpaper uri is "+wallpaperUriToSet+workrequestId);
         changeWallpaper(getBitmapFromImageUri(wallpaperUriToSet));
 
         return Result.success();
+    }
+
+    private Random rnd = new Random();
+
+    private int getImagesCount_FromDirs(String[] foldersUri_str){
+        int total = 0;
+        for(String uri_str : foldersUri_str){
+            total += getFilesFromDir(Uri.parse(uri_str)).length;
+        }
+        return total;
+    }
+
+    private Uri pickWallpaperFromFolders(String[] foldersUri_str){
+        Uri rnd_wallpaper = null;
+        int imagesTotal = getImagesCount_FromDirs(foldersUri_str);
+
+        Log.v("ObTask", "Total wallpapers = "+imagesTotal);
+
+        int chosenIndex = rnd.nextInt(imagesTotal);
+
+        Log.v("ObTask", "Chosen Index = "+chosenIndex);
+
+        int directoryIndex = 0;
+        while(foldersUri_str[directoryIndex].length() <= chosenIndex){
+            chosenIndex = chosenIndex - foldersUri_str[directoryIndex].length();
+            directoryIndex++;
+        }
+
+        Uri wallpaperDirUri = Uri.parse(foldersUri_str[directoryIndex]);
+        rnd_wallpaper = getFilesFromDir(wallpaperDirUri)[chosenIndex].getUri();
+
+        return rnd_wallpaper;
     }
 
     public void changeWallpaper(Bitmap bm){
@@ -162,8 +195,6 @@ public class ChangeWallpaper_Worker extends Worker {
 
     private DocumentFile[] getFilesFromDir(Uri folderUri){
         DocumentFile documentFile = DocumentFile.fromTreeUri(getApplicationContext(), folderUri);
-
-        ContentResolver contentResolver = getApplicationContext().getContentResolver();
 
         DocumentFile[] files = documentFile.listFiles();
         return files;
