@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.icu.util.Calendar;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -18,6 +19,8 @@ import android.os.*;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -29,6 +32,7 @@ import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import androidx.work.Data;
@@ -55,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
         String consoleText = console.getText().toString();
         consoleText = consoleText + arg;
         console.setText(consoleText);
-        Log.v("ObLog", arg);
+        Log.v("ObTask", arg);
     }
 
     @Override
@@ -69,13 +73,74 @@ public class MainActivity extends AppCompatActivity {
 //        displayTotalImagesToast();
 
         BindOnClick_AndChangeNames_OfAllButtons();
+        BindSoundSwitch();
     }
 
     private void BindOnClick_AndChangeNames_OfAllButtons() {
+        BindOnClick_AndChangeNames_First_Row_Buttons();
         BindOnClick_AndChangeNames_OfConsoleButtons();
+        BindOnClick_CheckService();
         BindOnClick_OfChangeButton();
         BindOnClick_OfStopper();
         BindOnClick_AndChangeNames_OfTestButton();
+    }
+
+    private void BindOnClick_AndChangeNames_First_Row_Buttons() {
+        Button firstButton = (Button) findViewById(R.id.WPbutton1);
+        Button secondButton = (Button) findViewById(R.id.WPbutton2);
+
+        firstButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                SharedPreferences sharedPref = getSharedPreferences(getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
+                SharedPreferences.Editor editor = sharedPref.edit();
+                editor.putStringSet(getString(R.string.images_dirs_key), new HashSet<>());
+                editor.apply();
+                //Treat loaded set as immutable please.
+            }
+        });
+        firstButton.setText("Clear Directories");
+
+        secondButton.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+
+            }
+        });
+        secondButton.setText("Debug");
+    }
+
+    private void BindOnClick_CheckService(){
+        Button checkServiceBtn = (Button) findViewById(R.id.checkBtn);
+        checkServiceBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                String dbgMsg = "Worker running? "+isWorkScheduled("WC");
+                Log.v("OBTask", dbgMsg);
+                Toast startSequenceToast = Toast.makeText(getApplicationContext(), dbgMsg, Toast.LENGTH_LONG);
+                startSequenceToast.show();
+            }
+        });
+
+
+
+    }
+
+    private boolean isWorkScheduled(String tag) {
+        WorkManager instance = WorkManager.getInstance();
+        ListenableFuture<List<WorkInfo>> statuses = instance.getWorkInfosByTag(tag);
+        try {
+            boolean running = false;
+            List<WorkInfo> workInfoList = statuses.get();
+            for (WorkInfo workInfo : workInfoList) {
+                WorkInfo.State state = workInfo.getState();
+                running = running | state == WorkInfo.State.RUNNING | state == WorkInfo.State.ENQUEUED;
+            }
+            return running;
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+            return false;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     private void BindOnClick_AndChangeNames_OfConsoleButtons() {
@@ -92,15 +157,7 @@ public class MainActivity extends AppCompatActivity {
         consoleButtons[0].setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
 
-                int total = 0;
-                for(String uri_str : loadDirSet()){
-                    total += getFilesFromDir(Uri.parse(uri_str)).length;
-                }
-
-                Toast startSequenceToast = Toast.makeText(getApplicationContext(), "Total Directories: "+loadDirSet().size()+"\nTotal Images: "+total, Toast.LENGTH_LONG);
-                startSequenceToast.show();
-
-                Log.v("OBTask", "Total Directories: "+loadDirSet().size()+"\nTotal Images: "+total);
+                displayTotalDirsAndFiles();
 
             }
         });
@@ -117,10 +174,36 @@ public class MainActivity extends AppCompatActivity {
         //Third
         consoleButtons[2].setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                //Do nothing
+                Set<String> dirSet = loadDirSet();
+
+                m_uri_data = new Data.Builder()
+                        .putString(ChangeWallpaper_Worker.DIR_URI_STR_KEY, "")
+                        .putStringArray(ChangeWallpaper_Worker.DIR_LIST_URIS_STR_KEY, (dirSet.toArray(new String[0])))
+                        .build();
+
+                OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
+                        .setInputData(m_uri_data)
+                        .addTag("WC")
+                        .build();
+
+                WorkManager.getInstance().enqueue(request);
+
+                Log.v("OBTask", "Started One time Work "+request.getId());
             }
         });
-//        consoleButtons[2].setText("Pick Folder");
+        consoleButtons[2].setText("Next Wallpaper");
+    }
+
+    private void displayTotalDirsAndFiles() {
+        int total = 0;
+        for(String uri_str : loadDirSet()){
+            total += getFilesFromDir(Uri.parse(uri_str)).length;
+        }
+
+        Toast startSequenceToast = Toast.makeText(getApplicationContext(), "Total Directories: "+loadDirSet().size()+"\nTotal Images: "+total, Toast.LENGTH_LONG);
+        startSequenceToast.show();
+
+        Log.v("OBTask", "Total Directories: "+loadDirSet().size()+"\nTotal Images: "+total);
     }
 
     private Data m_uri_data;
@@ -131,18 +214,9 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Set<String> dirSet = loadDirSet();
 
-                //For now we take the first directory
-                Uri firstDirectoryUri = Uri.parse(dirSet.iterator().next());
-                DocumentFile[] dirFiles = getFilesFromDir( firstDirectoryUri );
-                int dirSetLength = dirFiles.length;
-
-                Log("Starting Sequence : "+dirSetLength+" " +
-                        "elements");
-                Toast startSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
-                startSequenceToast.show();
+                displayTotalDirsAndFiles();
 
                 m_uri_data = new Data.Builder()
-                        .putString(ChangeWallpaper_Worker.DIR_URI_STR_KEY, firstDirectoryUri.toString())
                         .putStringArray(ChangeWallpaper_Worker.DIR_LIST_URIS_STR_KEY, (dirSet.toArray(new String[0])))
                         .build();
 
@@ -154,30 +228,7 @@ public class MainActivity extends AppCompatActivity {
 //                WorkManager.getInstance().enqueue(changeWallpaper_work);
                 WorkManager.getInstance().enqueueUniquePeriodicWork("ChangeWallpaper_Loop", ExistingPeriodicWorkPolicy.REPLACE, changeWallpaper_work);
 
-                Log.v("OBTask", "Started Work "+changeWallpaper_work.getId());
-
-//                Intent changeWallpaper_intent = new Intent(getApplicationContext(), WallpaperService.class);
-//
-//                String[] wallpaperUris_str = new String[5];
-//                for(int i=0; i<5; i++){
-//                    wallpaperUris_str[i] = dirFiles[i].getUri().toString();
-//                }
-//
-//                changeWallpaper_intent.putExtra(WallpaperService.WALLPAPER_URIS, wallpaperUris_str);
-//                startService(changeWallpaper_intent);
-
-//                OneTimeWorkRequest firstRequest = changeWallpaperAfterSeconds_WorkManager(11, dirFiles[0].getUri());
-//                WorkContinuation continuation = WorkManager.getInstance().beginWith(firstRequest);
-//
-//                continuation.then(changeWallpaperAfterSeconds_WorkManager(11, dirFiles[1].getUri()));
-//                continuation.then(changeWallpaperAfterSeconds_WorkManager(11, dirFiles[2].getUri()));
-//
-//                continuation.enqueue();
-
-
-//                for (int i=0; i < dirSetLength; i++){
-//                    changeWallpaperAfterSeconds_WorkManager((10 * i) +1, dirFiles[i].getUri());
-//                }
+                Log( "Started Work "+changeWallpaper_work.getId()+" at time "+ Calendar.getInstance().getTime());
 
             }
         });
@@ -251,21 +302,19 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    //TODO: fix this method.
-//    private void displayTotalImagesToast() {
-//        Set<String> images_set = loadMainImagesSet();
-//        String first = "None";
-//        int totalImages = 0;
-//        if(images_set != null && images_set.size() != 0){
-//            first = images_set.iterator().next();
-//            totalImages = images_set.size();
-//        }
-//        Toast toast = Toast.makeText(getApplicationContext(), totalImages+" Images total. First is "+first, Toast.LENGTH_LONG);
-//        toast.show();
-//    }
+    private void BindSoundSwitch(){
+        Switch soundSwitch = (Switch) findViewById(R.id.switch1);
+        soundSwitch.setChecked(ChangeWallpaper_Worker.Sound_On_Change);
+        soundSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                ChangeWallpaper_Worker.Sound_On_Change = isChecked;
+            }
+        });
+
+    }
 
     private Set<String> loadDirSet(){
-        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
 
         Set<String> images_set = sharedPref.getStringSet(getString(R.string.images_dirs_key), new HashSet<String>());
 
@@ -403,7 +452,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void AddDirReference(Uri directoryUri) {
         String directoryUri_str = directoryUri.toString();
-        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.Images_Lists_SharedPrefName), Context.MODE_PRIVATE);
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
 
         //Treat loaded set as immutable please.
         Set<String> loaded_set_immutable = sharedPref.getStringSet(getString(R.string.images_dirs_key), new HashSet<String>());

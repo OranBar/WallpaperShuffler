@@ -29,14 +29,13 @@
 
     <Button
         android:id="@+id/changeButton"
-        android:layout_width="212dp"
-        android:layout_height="71dp"
+        android:layout_width="134dp"
+        android:layout_height="55dp"
         android:layout_below="@+id/WPbutton1"
-        android:layout_alignParentStart="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginStart="117dp"
-        android:layout_marginTop="29dp"
-        android:layout_marginEnd="129dp"
+        android:layout_marginStart="103dp"
+        android:layout_marginTop="50dp"
+        android:layout_marginEnd="38dp"
         android:text="Change Then Again" />
 
     <Button
@@ -45,8 +44,8 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/WPbutton2"
         android:layout_alignParentEnd="true"
-        android:layout_marginTop="179dp"
-        android:layout_marginEnd="35dp"
+        android:layout_marginTop="189dp"
+        android:layout_marginEnd="30dp"
         android:text="Add Image" />
 
     <Button
@@ -61,8 +60,8 @@
 
     <TextView
         android:id="@+id/console_textview"
-        android:layout_width="382dp"
-        android:layout_height="222dp"
+        android:layout_width="379dp"
+        android:layout_height="149dp"
         android:layout_alignParentBottom="true"
         android:layout_marginBottom="6dp"
         android:text="Console:" />
@@ -93,7 +92,29 @@
         android:layout_marginStart="18dp"
         android:layout_marginBottom="28dp"
         android:layout_toEndOf="@+id/ConsoleBtn2"
-        android:text="CB3" /><![CDATA[
+        android:text="CB3" />
+
+    <Switch
+        android:id="@+id/switch1"
+        android:layout_width="167dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/test"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="25dp"
+        android:layout_marginTop="41dp"
+        android:text="Sound On Change" />
+
+    <Button
+        android:id="@+id/checkBtn"
+        android:layout_width="98dp"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/WPbutton1"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="27dp"
+        android:layout_marginTop="40dp"
+        android:text="Check Service Run" /><![CDATA[
+
+
 
 
 
@@ -105,6 +126,7 @@
         android:layout_alignTop="@+id/button"
         android:layout_alignParentStart="true"
         android:id="@+id/textView2" />
+
 
 ]]>
 </RelativeLayout>
