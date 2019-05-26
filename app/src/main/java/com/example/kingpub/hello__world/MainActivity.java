@@ -44,12 +44,6 @@ import androidx.work.WorkManager;
 
 public class MainActivity extends AppCompatActivity {
 
-    public static final String EXTRA_MESSAGE = "com.kingpub.wallpaperShuffler.MSG" ;
-
-    //--- {vars for shuffle
-    public int currWallpaperIndex = 0;
-    //----- vars for shuffle}
-
     private TextView console;
     private Button[] consoleButtons;
 
@@ -67,13 +61,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
-        currWallpaperIndex = 0;
-        //----- Setup for shuffle}
-//        displayTotalImagesToast();
-
         BindOnClick_AndChangeNames_OfAllButtons();
-        BindSoundSwitch();
     }
 
     private void BindOnClick_AndChangeNames_OfAllButtons() {
@@ -83,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
         BindOnClick_OfChangeButton();
         BindOnClick_OfStopper();
         BindOnClick_AndChangeNames_OfTestButton();
+        BindSoundSwitch();
     }
 
     private void BindOnClick_AndChangeNames_First_Row_Buttons() {
@@ -95,7 +84,6 @@ public class MainActivity extends AppCompatActivity {
                 SharedPreferences.Editor editor = sharedPref.edit();
                 editor.putStringSet(getString(R.string.images_dirs_key), new HashSet<>());
                 editor.apply();
-                //Treat loaded set as immutable please.
             }
         });
         firstButton.setText("Clear Directories");
@@ -118,9 +106,6 @@ public class MainActivity extends AppCompatActivity {
                 startSequenceToast.show();
             }
         });
-
-
-
     }
 
     private boolean isWorkScheduled(String tag) {
@@ -220,18 +205,27 @@ public class MainActivity extends AppCompatActivity {
                         .putStringArray(ChangeWallpaper_Worker.DIR_LIST_URIS_STR_KEY, (dirSet.toArray(new String[0])))
                         .build();
 
-                changeWallpaper_work = new PeriodicWorkRequest.Builder(ChangeWallpaper_Worker.class, 15, TimeUnit.MINUTES, 1, TimeUnit.MINUTES)
+                OneTimeWorkRequest onetime_changeWallpaper_work = new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
                         .setInputData(m_uri_data)
                         .addTag("WC")
                         .build();
 
-//                WorkManager.getInstance().enqueue(changeWallpaper_work);
-                WorkManager.getInstance().enqueueUniquePeriodicWork("ChangeWallpaper_Loop", ExistingPeriodicWorkPolicy.REPLACE, changeWallpaper_work);
+                WorkManager.getInstance().enqueue(onetime_changeWallpaper_work);
 
-                Log( "Started Work "+changeWallpaper_work.getId()+" at time "+ Calendar.getInstance().getTime());
+//                changeWallpaper_work = new PeriodicWorkRequest.Builder(ChangeWallpaper_Worker.class, 15, TimeUnit.MINUTES, 1, TimeUnit.MINUTES)
+//                        .setInputData(m_uri_data)
+//                        .addTag("WC")
+//                        .build();
+
+//                WorkManager.getInstance().enqueue(changeWallpaper_work);
+//                WorkManager.getInstance().enqueueUniquePeriodicWork("ChangeWallpaper_Loop", ExistingPeriodicWorkPolicy.REPLACE, changeWallpaper_work);
+
+//                Log( "Started Work "+changeWallpaper_work.getId()+" at time "+ Calendar.getInstance().getTime());
 
             }
         });
+
+        changeTwiceButton.setText("> Change Once <");
     }
 
     private void BindOnClick_OfStopper() {
@@ -244,7 +238,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.v("OBTask", "Is Done = "+WorkManager.getInstance().getWorkInfosByTag("WC").isDone());
 
                 if(WorkManager.getInstance().getWorkInfosByTag("WC").cancel(true)){
-                    Log.v("OBTasks", "Second attempt to kill service");
+                    Log.v("OBTasks", "attempt to kill service");
                     WorkManager.getInstance().pruneWork();
                 }
 
@@ -321,64 +315,6 @@ public class MainActivity extends AppCompatActivity {
         return images_set;
     }
 
-    public OneTimeWorkRequest changeWallpaperAfterSeconds_WorkManager(int seconds, final Uri imageUri){
-
-        Data uri_data = new Data.Builder()
-                .putString(ChangeWallpaper_Worker.IMG_URI_STR_KEY, imageUri.toString())
-                .build();
-
-        OneTimeWorkRequest myWork =
-                new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
-                        .setInputData(uri_data)
-                        .setInitialDelay(seconds, TimeUnit.SECONDS)// Use this when you want to add initial delay or schedule initial work to `OneTimeWorkRequest` e.g. setInitialDelay(2, TimeUnit.HOURS)
-        .build();
-
-        return myWork;
-    }
-
-    public void changeWallpaperAfterSeconds(int seconds, final Uri imageUri){
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                Bitmap newWallpaper = null;
-
-                try {
-                    ContentResolver contentResolver = getContentResolver();
-                    InputStream is = null;
-                    is = contentResolver.openInputStream(imageUri);
-                    newWallpaper = BitmapFactory.decodeStream(is);
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                    return;
-                }
-
-                changeWallpaper(newWallpaper);
-
-                CharSequence text = "Changing wallpaper to "+imageUri.toString();
-                int duration = Toast.LENGTH_LONG;
-
-                Toast toast = Toast.makeText(getApplicationContext(), text, duration);
-                toast.show();
-            }
-        }, 1000 * seconds);
-    }
-
-
-//    @Override
-//    protected void onStop()
-//    {
-//        for(BroadcastReceiver curr : CURRENT_ACTIVE_RECIEVERS ){
-//            try{
-//                unregisterReceiver(curr);
-//            }catch(IllegalArgumentException e){ ; }
-//        }
-//        super.onStop();
-//    }
-
-    public void changeWallpaper(View view, Bitmap bm){
-        changeWallpaper(bm);
-    }
-
     public void changeWallpaper(Bitmap bm){
 
         Log.v("OBTask","ChangeWallpaper!");
@@ -420,34 +356,6 @@ public class MainActivity extends AppCompatActivity {
 
         DocumentFile[] files = documentFile.listFiles();
         return files;
-    }
-
-    private void selectWallpaperFromFolder(Uri folderUri){
-        DocumentFile documentFile = DocumentFile.fromTreeUri(this, folderUri);
-
-        ContentResolver contentResolver = getContentResolver();
-
-        DocumentFile[] files = documentFile.listFiles();
-
-        ;  //For now, we pick first. Then, we do random
-
-        currWallpaperIndex = currWallpaperIndex+1;
-        DocumentFile file = files[ currWallpaperIndex%files.length ];
-
-        if (file.isDirectory()) { // if it is sub directory
-            // Do stuff with sub directory
-            Log("ERROR: Found dir instead of file");
-        } else {
-            // Do stuff with normal file
-            try {
-                InputStream is = contentResolver.openInputStream(file.getUri());
-                Bitmap myImage = BitmapFactory.decodeStream(is);
-                changeWallpaper(myImage);
-//                        changeWallpaper(myImage);
-            } catch (Exception e) {
-
-            }
-        }
     }
 
     public void AddDirReference(Uri directoryUri) {

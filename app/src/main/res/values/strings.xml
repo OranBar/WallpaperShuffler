@@ -5,4 +5,8 @@
 
     <string name="OBbWallpaperShuffler_SharedPrefName">Images_List</string>
     <string name="images_dirs_key">com.kingpub.wallpapershuffler.ShPrefKey_imagesDirs_uris</string>
+    <string name="title_activity_home">HomeActivity</string>
+    <string name="title_activity_main2">Main2Activity</string>
+    <string name="appwidget_text">EXAMPLE</string>
+    <string name="add_widget">Add widget</string>
 </resources>

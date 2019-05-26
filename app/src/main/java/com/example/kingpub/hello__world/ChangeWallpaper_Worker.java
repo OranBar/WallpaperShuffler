@@ -6,12 +6,15 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Rect;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.support.annotation.NonNull;
 import android.support.v4.provider.DocumentFile;
+import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 import java.io.FileNotFoundException;
@@ -44,17 +47,6 @@ public class ChangeWallpaper_Worker extends Worker {
         Log.v("OBChangeWallpaper", "Create");
         workrequestId = " (WorkRequestId= "+this.getId()+")";
     }
-//    @NonNull
-//    @Override
-//    public Result doWork() {
-//
-//        String wallpaperUriToSet_str = getInputData().getString(IMG_URI_STR_KEY);
-//
-//        Uri wallpaperUriToSet = Uri.parse(wallpaperUriToSet_str);
-//        changeWallpaper(getBitmapFromImageUri(wallpaperUriToSet));
-//
-//        return Result.success();
-//    }
 
     private static int Current_Index = -1;
 
@@ -73,7 +65,8 @@ public class ChangeWallpaper_Worker extends Worker {
         Uri wallpaperUriToSet = pickWallpaperFromFolders(dirsUris_str);
 
         Log.v("OBChangeWallpaper","Chosen wallpaper uri is "+wallpaperUriToSet+workrequestId);
-        changeWallpaper(getBitmapFromImageUri(wallpaperUriToSet));
+//        changeWallpaper(getBitmapFromImageUri(wallpaperUriToSet));
+        changeWallpaper(wallpaperUriToSet);
 
 //        Data output = new Data.Builder()
 //                .putString(CHOSEN_WALLPAPER_URI_RESULT_KEY, wallpaperUriToSet.toString())
@@ -107,6 +100,7 @@ public class ChangeWallpaper_Worker extends Worker {
         Log.v("ObTask", "Total wallpapers = "+imagesTotal);
 
         int chosenIndex = rnd.nextInt(imagesTotal);
+//        int chosenIndex = 11;
 
         Log.v("ObTask", "Chosen Index = "+chosenIndex);
 
@@ -135,8 +129,8 @@ public class ChangeWallpaper_Worker extends Worker {
         WallpaperManager wallpaperManager =  WallpaperManager.getInstance(getApplicationContext());
 
         try {
-            wallpaperManager.setBitmap(bm, null ,true, WallpaperManager.FLAG_LOCK);
-            wallpaperManager.setBitmap(bm);
+            wallpaperManager.setBitmap(bm , null ,false, WallpaperManager.FLAG_LOCK);
+            wallpaperManager.setBitmap(bm );
             Log.v("OBTask", "Change Wallpaper Successful"+workrequestId);
         } catch (IOException e) {
             e.printStackTrace();
@@ -150,6 +144,150 @@ public class ChangeWallpaper_Worker extends Worker {
         }
     }
 
+    public void changeWallpaper(Uri bm_uri){
+
+        Log.v("OBTask","Changing Wallpaper!"+workrequestId);
+
+        WallpaperManager wallpaperManager =  WallpaperManager.getInstance(getApplicationContext());
+
+        try {
+            //import non-scaled bitmap wallpaper
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inScaled = false;
+
+            InputStream is = null;
+            ContentResolver contentResolver = getApplicationContext().getContentResolver();
+            is = contentResolver.openInputStream(bm_uri);
+            Bitmap wallpaper = BitmapFactory.decodeStream(is, null, options);
+
+
+            float aspectRatio = wallpaper.getWidth() /
+                    (float) wallpaper.getHeight();
+            int b_width = 1080;
+            int b_height = Math.round(b_width / aspectRatio);
+
+            Bitmap bitmap = Bitmap.createScaledBitmap(wallpaper, b_width, b_height, true);
+            wallpaper = bitmap;
+//                decodedSampleBitmap = Bitmap.createScaledBitmap(
+//                        decodedSampleBitmap, b_width, b_height, false);
+//            Bitmap wallpaper = BitmapFactory.decodeResource(getResources(), R.drawable.wallpaper, options);
+
+            if (wallpaperManager.getDesiredMinimumWidth() > wallpaper.getWidth() &&
+                    wallpaperManager.getDesiredMinimumHeight() > wallpaper.getHeight()) {
+                //add padding to wallpaper so background image scales correctly
+                int xPadding = Math.max(0, wallpaperManager.getDesiredMinimumWidth() - wallpaper.getWidth()) / 2;
+                int yPadding = Math.max(0, wallpaperManager.getDesiredMinimumHeight() - wallpaper.getHeight()) / 2;
+                Bitmap paddedWallpaper = Bitmap.createBitmap(wallpaperManager.getDesiredMinimumWidth(), wallpaperManager.getDesiredMinimumHeight(), Bitmap.Config.ARGB_8888);
+                int[] pixels = new int[wallpaper.getWidth() * wallpaper.getHeight()];
+                wallpaper.getPixels(pixels, 0, wallpaper.getWidth(), 0, 0, wallpaper.getWidth(), wallpaper.getHeight());
+                paddedWallpaper.setPixels(pixels, 0, wallpaper.getWidth(), xPadding, yPadding, wallpaper.getWidth(), wallpaper.getHeight());
+
+                wallpaperManager.setBitmap(paddedWallpaper, null, false, WallpaperManager.FLAG_LOCK);
+                wallpaperManager.setBitmap(paddedWallpaper);
+            } else {
+                wallpaperManager.setBitmap(wallpaper);
+            }
+        } catch (IOException e) {
+            Log.e("OBTask", "Change Wallpaper FAILED"+workrequestId);
+        }
+
+        Log.v("OBTask", "Change Wallpaper Successful"+workrequestId);
+
+        if(Sound_On_Change){
+            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+            r.play();
+        }
+    }
+
+    public void changeWallpaper_(Uri bm_uri){
+
+        Log.v("OBTask","Changing Wallpaper!"+workrequestId);
+
+        WallpaperManager wallpaperManager =  WallpaperManager.getInstance(getApplicationContext());
+
+        try {
+            DisplayMetrics displayMetrics = new DisplayMetrics();
+            WindowManager windowManager = getApplicationContext().getSystemService(WindowManager.class);
+            windowManager.getDefaultDisplay().getMetrics(displayMetrics);
+            int height = displayMetrics.heightPixels;
+            int width = displayMetrics.widthPixels;
+//            width = width << 1; // best wallpaper width is twice screen width
+
+            // First decode with inJustDecodeBounds=true to check dimensions
+            final BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            ContentResolver contentResolver = getApplicationContext().getContentResolver();
+            InputStream is = null;
+            is = contentResolver.openInputStream(bm_uri);
+            BitmapFactory.decodeStream(is, null, options);
+
+
+            // Calculate inSampleSize
+            options.inSampleSize = calculateInSampleSize(options, width, height);
+
+            // Decode bitmap with inSampleSize set
+            options.inJustDecodeBounds = false;
+            is = contentResolver.openInputStream(bm_uri);
+
+
+            Bitmap decodedSampleBitmap = BitmapFactory.decodeStream(is);
+
+
+            try {
+                float aspectRatio = decodedSampleBitmap.getWidth() /
+                        (float) decodedSampleBitmap.getHeight();
+                int b_width = 1080;
+                int b_height = Math.round(b_width / aspectRatio);
+
+//                Bitmap bitmap = Bitmap.createScaledBitmap(decodedSampleBitmap, width, height, true);
+//                decodedSampleBitmap = bitmap;
+//                decodedSampleBitmap = Bitmap.createScaledBitmap(
+//                        decodedSampleBitmap, b_width, b_height, false);
+
+                wallpaperManager.setBitmap(decodedSampleBitmap,null,false,WallpaperManager.FLAG_LOCK);
+                wallpaperManager.setBitmap(decodedSampleBitmap,null,false);
+
+//                wallpaperManager.setBitmap(decodedSampleBitmap);
+            } catch (IOException e) {
+                Log.e("OBError", "Cannot set image as wallpaper", e);
+            }
+
+            Log.v("OBTask", "Change Wallpaper Successful"+workrequestId);
+        } catch (IOException e) {
+            e.printStackTrace();
+            Log.e("OBTask", "Change Wallpaper FAILED"+workrequestId);
+        }
+
+        if(Sound_On_Change){
+            Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
+            r.play();
+        }
+    }
+
+    public static int calculateInSampleSize(
+            BitmapFactory.Options options, int reqWidth, int reqHeight) {
+        // Raw height and width of image
+        final int height = options.outHeight;
+        final int width = options.outWidth;
+        int inSampleSize = 1;
+
+        if (height > reqHeight || width > reqWidth) {
+
+            final int halfHeight = height / 2;
+            final int halfWidth = width / 2;
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while ((halfHeight / inSampleSize) > reqHeight
+                    && (halfWidth / inSampleSize) > reqWidth) {
+                inSampleSize *= 2;
+            }
+        }
+
+        return inSampleSize;
+    }
 
     private Bitmap getBitmapFromImageUri(Uri imageUri){
         Bitmap newWallpaper = null;
@@ -165,46 +303,6 @@ public class ChangeWallpaper_Worker extends Worker {
 
         return newWallpaper;
     }
-
-    public void changeWallpaperAfterSeconds_WorkManager(int seconds, final Uri imageUri){
-
-        Data uri_data = new Data.Builder()
-                .putString(ChangeWallpaper_Worker.IMG_URI_STR_KEY, imageUri.toString())
-                .build();
-
-        OneTimeWorkRequest myWork =
-                new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
-                        .setInputData(uri_data)
-                        .setInitialDelay(seconds, TimeUnit.SECONDS)// Use this when you want to add initial delay or schedule initial work to `OneTimeWorkRequest` e.g. setInitialDelay(2, TimeUnit.HOURS)
-                        .build();
-
-        WorkManager.getInstance().enqueue(myWork);
-    }
-
-    public void scheduleNextWallpaper() {
-        Set<String> dirSet = loadDirSet();
-
-        //For now we take the first directory
-        DocumentFile[] dirFiles = getFilesFromDir( Uri.parse(dirSet.iterator().next() ));
-        int dirSetLength = dirFiles.length;
-
-        Toast statrtSequenceToast = Toast.makeText(getApplicationContext(), "Starting Sequence : "+dirSetLength+" elements", Toast.LENGTH_LONG);
-        statrtSequenceToast.show();
-
-        Current_Index = Current_Index +1;
-
-    }
-
-
-    private Set<String> loadDirSet(){
-        SharedPreferences sharedPref = getApplicationContext().getSharedPreferences(getApplicationContext().getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
-
-        Set<String> images_set = sharedPref.getStringSet(getApplicationContext().getString(R.string.images_dirs_key), new HashSet<String>());
-
-        return images_set;
-    }
-
-
 
     private DocumentFile[] getFilesFromDir(Uri folderUri){
         DocumentFile documentFile = DocumentFile.fromTreeUri(getApplicationContext(), folderUri);
