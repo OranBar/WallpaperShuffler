@@ -6,16 +6,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.icu.util.Calendar;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
-import android.os.Looper;
 import android.support.v4.provider.DocumentFile;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.os.*;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -26,9 +22,7 @@ import android.widget.Toast;
 
 import com.google.common.util.concurrent.ListenableFuture;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -193,39 +187,52 @@ public class MainActivity extends AppCompatActivity {
 
     private Data m_uri_data;
 
+    private void change_wallpaper_once_with_worker(){
+
+        m_uri_data = get_img_dir_uri_data();
+
+        OneTimeWorkRequest onetime_changeWallpaper_work = new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
+                .setInputData(m_uri_data)
+                .addTag("WC")
+                .build();
+
+        WorkManager.getInstance().enqueue(onetime_changeWallpaper_work);
+    }
+
+    private Data get_img_dir_uri_data(){
+        Set<String> dirSet = loadDirSet();
+
+        displayTotalDirsAndFiles();
+
+        Data m_uri_data = new Data.Builder()
+                .putStringArray(ChangeWallpaper_Worker.DIR_LIST_URIS_STR_KEY, (dirSet.toArray(new String[0])))
+                .build();
+
+        return m_uri_data;
+    }
+
     private void BindOnClick_OfChangeButton(){
         final Button changeTwiceButton = (Button) findViewById(R.id.changeButton);
         changeTwiceButton.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                Set<String> dirSet = loadDirSet();
+//                change_wallpaper_once_with_worker();
 
-                displayTotalDirsAndFiles();
+                m_uri_data = get_img_dir_uri_data();
 
-                m_uri_data = new Data.Builder()
-                        .putStringArray(ChangeWallpaper_Worker.DIR_LIST_URIS_STR_KEY, (dirSet.toArray(new String[0])))
-                        .build();
-
-                OneTimeWorkRequest onetime_changeWallpaper_work = new OneTimeWorkRequest.Builder(ChangeWallpaper_Worker.class)
+                changeWallpaper_work = new PeriodicWorkRequest.Builder(ChangeWallpaper_Worker.class, 15, TimeUnit.MINUTES, 1, TimeUnit.MINUTES)
                         .setInputData(m_uri_data)
                         .addTag("WC")
                         .build();
 
-                WorkManager.getInstance().enqueue(onetime_changeWallpaper_work);
-
-//                changeWallpaper_work = new PeriodicWorkRequest.Builder(ChangeWallpaper_Worker.class, 15, TimeUnit.MINUTES, 1, TimeUnit.MINUTES)
-//                        .setInputData(m_uri_data)
-//                        .addTag("WC")
-//                        .build();
-
 //                WorkManager.getInstance().enqueue(changeWallpaper_work);
-//                WorkManager.getInstance().enqueueUniquePeriodicWork("ChangeWallpaper_Loop", ExistingPeriodicWorkPolicy.REPLACE, changeWallpaper_work);
+                WorkManager.getInstance().enqueueUniquePeriodicWork("ChangeWallpaper_Loop", ExistingPeriodicWorkPolicy.REPLACE, changeWallpaper_work);
 
 //                Log( "Started Work "+changeWallpaper_work.getId()+" at time "+ Calendar.getInstance().getTime());
 
             }
         });
 
-        changeTwiceButton.setText("> Change Once <");
+        changeTwiceButton.setText("> Start <");
     }
 
     private void BindOnClick_OfStopper() {
@@ -292,19 +299,19 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         test.setText("SuperStopper");
-
-
     }
+
 
     private void BindSoundSwitch(){
         Switch soundSwitch = (Switch) findViewById(R.id.switch1);
-        soundSwitch.setChecked(ChangeWallpaper_Worker.Sound_On_Change);
+        soundSwitch.setChecked(IsSoundOn_SharedPref());
         soundSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                ChangeWallpaper_Worker.Sound_On_Change = isChecked;
+                Update_IsSoundOn_SharedPref(isChecked);
+                Toast t = Toast.makeText(getApplicationContext(), "Sound is : "+isChecked, Toast.LENGTH_LONG);
+                t.show();
             }
         });
-
     }
 
     private Set<String> loadDirSet(){
@@ -370,7 +377,26 @@ public class MainActivity extends AppCompatActivity {
         images_set.add(directoryUri_str);
 
         SharedPreferences.Editor editor = sharedPref.edit();
+        editor.clear();
         editor.putStringSet(getString(R.string.images_dirs_key), images_set);
+        editor.apply();
+    }
+
+    private boolean IsSoundOn_SharedPref(){
+        SharedPreferences sharedPref = getApplicationContext().getSharedPreferences(getApplicationContext().getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
+
+        //Treat loaded set as immutable please.
+        boolean is_sound_on = sharedPref.getBoolean(getApplicationContext().getString(R.string.sound_on), true);
+
+        return is_sound_on;
+    }
+
+    public void Update_IsSoundOn_SharedPref(boolean turnSoundOn) {
+        SharedPreferences sharedPref = getSharedPreferences(getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
+
+        SharedPreferences.Editor editor = sharedPref.edit();
+        editor.clear();
+        editor.putBoolean(getString(R.string.sound_on), turnSoundOn);
         editor.apply();
     }
 

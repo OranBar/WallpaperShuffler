@@ -31,7 +31,7 @@ import java.util.Set;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
-public class ChangeWallpaper_Service extends BroadcastReceiver {
+public class ChangeWallpaper_BroadcastReceiver extends BroadcastReceiver {
 
     public static final String IMG_URI_STR_KEY = "IMG_URI";
     public static final String DIR_URI_STR_KEY = "DIR_URI";
@@ -42,7 +42,7 @@ public class ChangeWallpaper_Service extends BroadcastReceiver {
     public boolean sound_on_change = true;
 
 
-    public ChangeWallpaper_Service() {
+    public ChangeWallpaper_BroadcastReceiver() {
         super();
         Log.v("OBChangeWallpaperService", "Create");
         sound_on_change = IsSoundOn_SharedPref();

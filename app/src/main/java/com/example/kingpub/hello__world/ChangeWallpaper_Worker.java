@@ -6,12 +6,13 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Rect;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.Looper;
 import android.support.annotation.NonNull;
 import android.support.v4.provider.DocumentFile;
+import android.support.v7.app.NotificationCompat;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.WindowManager;
@@ -20,14 +21,8 @@ import android.widget.Toast;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
-import androidx.work.Data;
-import androidx.work.OneTimeWorkRequest;
-import androidx.work.WorkManager;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
@@ -39,13 +34,14 @@ public class ChangeWallpaper_Worker extends Worker {
     public static final String CHOSEN_WALLPAPER_URI_RESULT_KEY = "CHOSEN_WALLPAPER_URI_RESULT";
 
     private String workrequestId = "";
-    public static boolean Sound_On_Change = true;
+    public boolean sound_on_change = true;
 
 
     public ChangeWallpaper_Worker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
         Log.v("OBChangeWallpaper", "Create");
         workrequestId = " (WorkRequestId= "+this.getId()+")";
+        sound_on_change = IsSoundOn_SharedPref();
     }
 
     private static int Current_Index = -1;
@@ -104,6 +100,13 @@ public class ChangeWallpaper_Worker extends Worker {
 
         Log.v("ObTask", "Chosen Index = "+chosenIndex);
 
+//        Looper.prepare();
+//        Looper.loop();
+//        Toast startSequenceToast = Toast.makeText(getApplicationContext(), "Chosen Index = "+chosenIndex, Toast.LENGTH_LONG);
+//        startSequenceToast.show();
+//        Looper looper = Looper.myLooper();
+//        looper.quit();
+
         int directoryIndex = 0;
         int currDirImagesCount = getImagesCount_FromDir(foldersUri_str[directoryIndex]);
         while(currDirImagesCount  <= chosenIndex){
@@ -122,6 +125,14 @@ public class ChangeWallpaper_Worker extends Worker {
         return rnd_wallpaper;
     }
 
+//    private void createNotification(){
+//        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, 0)
+//                .setSmallIcon(R.drawable.notification_icon)
+//                .setContentTitle(textTitle)
+//                .setContentText(textContent)
+//                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+//    }
+
     public void changeWallpaper(Bitmap bm){
 
         Log.v("OBTask","Changing Wallpaper!"+workrequestId);
@@ -137,7 +148,7 @@ public class ChangeWallpaper_Worker extends Worker {
             Log.e("OBTask", "Change Wallpaper FAILED"+workrequestId);
         }
 
-        if(Sound_On_Change){
+        if(sound_on_change){
             Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
             r.play();
@@ -182,10 +193,14 @@ public class ChangeWallpaper_Worker extends Worker {
                 wallpaper.getPixels(pixels, 0, wallpaper.getWidth(), 0, 0, wallpaper.getWidth(), wallpaper.getHeight());
                 paddedWallpaper.setPixels(pixels, 0, wallpaper.getWidth(), xPadding, yPadding, wallpaper.getWidth(), wallpaper.getHeight());
 
-                wallpaperManager.setBitmap(paddedWallpaper, null, false, WallpaperManager.FLAG_LOCK);
+                wallpaperManager.setBitmap(paddedWallpaper, null, true, WallpaperManager.FLAG_LOCK);
                 wallpaperManager.setBitmap(paddedWallpaper);
+
+                Log.e("WallpaperChanger", "Wallpaper WAS scaled to "+paddedWallpaper.getWidth()+"/"+paddedWallpaper.getHeight());
             } else {
                 wallpaperManager.setBitmap(wallpaper);
+
+                Log.e("WallpaperChanger", "Wallpaper was NOT scaled");
             }
         } catch (IOException e) {
             Log.e("OBTask", "Change Wallpaper FAILED"+workrequestId);
@@ -193,7 +208,7 @@ public class ChangeWallpaper_Worker extends Worker {
 
         Log.v("OBTask", "Change Wallpaper Successful"+workrequestId);
 
-        if(Sound_On_Change){
+        if(sound_on_change){
             Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
             r.play();
@@ -259,7 +274,7 @@ public class ChangeWallpaper_Worker extends Worker {
             Log.e("OBTask", "Change Wallpaper FAILED"+workrequestId);
         }
 
-        if(Sound_On_Change){
+        if(sound_on_change){
             Uri notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
             Ringtone r = RingtoneManager.getRingtone(getApplicationContext(), notification);
             r.play();
@@ -309,5 +324,14 @@ public class ChangeWallpaper_Worker extends Worker {
 
         DocumentFile[] files = documentFile.listFiles();
         return files;
+    }
+
+    private boolean IsSoundOn_SharedPref(){
+        SharedPreferences sharedPref = getApplicationContext().getSharedPreferences(getApplicationContext().getString(R.string.OBbWallpaperShuffler_SharedPrefName), Context.MODE_PRIVATE);
+
+        //Treat loaded set as immutable please.
+        boolean is_sound_on = sharedPref.getBoolean(getApplicationContext().getString(R.string.sound_on), true);
+
+        return is_sound_on;
     }
 }
